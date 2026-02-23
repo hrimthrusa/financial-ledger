@@ -19,40 +19,40 @@ import java.util.UUID;
 @Service
 public class AccountService {
 
-    private final AccountRepository accounts;
-    private final EntryRepository entries;
+    private final AccountRepository accountRepository;
+    private final EntryRepository entryRepository;
 
-    public AccountService(AccountRepository accounts, EntryRepository entries) {
-        this.accounts = accounts;
-        this.entries = entries;
+    public AccountService(AccountRepository accountRepository, EntryRepository entryRepository) {
+        this.accountRepository = accountRepository;
+        this.entryRepository = entryRepository;
     }
 
     @Transactional
     public AccountDto.AccountResponse create(AccountDto.CreateAccountRequest req) {
-        if (accounts.existsByNameIgnoreCase(req.name().trim())) {
+        if (accountRepository.existsByNameIgnoreCase(req.name().trim())) {
             throw new BusinessRuleViolationException("Account name must be unique");
         }
         var entity = new Account(UUID.randomUUID(), req.name().trim(), req.type(), Instant.now());
-        accounts.save(entity);
+        accountRepository.save(entity);
 
         return toResponse(entity, BigDecimal.ZERO);
     }
 
     @Transactional(readOnly = true)
     public List<AccountDto.AccountResponse> getAll() {
-        return accounts.findAll().stream()
+        return accountRepository.findAll().stream()
                 .map(a -> toResponse(a, calculateBalance(a.getId(), a.getType())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public AccountDto.AccountResponse getById(UUID id) {
-        var account = accounts.findById(id).orElseThrow(() -> new NotFoundException("Account not found: " + id));
+        var account = accountRepository.findById(id).orElseThrow(() -> new NotFoundException("Account not found: " + id));
         return toResponse(account, calculateBalance(account.getId(), account.getType()));
     }
 
     private BigDecimal calculateBalance(UUID accountId, AccountType type) {
-        return entries.findAllByAccountId(accountId).stream()
+        return entryRepository.findAllByAccountId(accountId).stream()
                 .map(e -> BalanceRules.signed(type, e.getEntryType(), e.getAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
